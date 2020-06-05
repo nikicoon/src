@@ -92,15 +92,31 @@ system(const char *command)
 	(void)__readlockenv();
 	int status;
 	status = posix_spawn(&pid, _PATH_BSHELL, NULL, NULL, __UNCONST(argp), environ);
+	/*
+	 * IEEE Std 1003.1-2017, 16.371: Upon successful completion,
+	 * posix_spawn() and posix_spawnp() shall return the process
+	 * ID of the child process to the parent process, in the
+	 * variable pointed to by a non-NULL pid argument, and shall
+	 * return zero as the function return value. Otherwise, no
+	 * child process shall be created, the value stored into the
+	 * variable pointed to by a non-NULL pid is unspecified, and
+	 * an error number shall be returned as the function return
+	 * value to indicate the error. If the pid argument is a null
+	 * pointer, the process ID of the child is not returned to the
+	 * caller.
+	 */
 	if (status == 0) {
 		/* child */
 		sigaction(SIGINT, &intsa, NULL);
 		sigaction(SIGQUIT, &quitsa, NULL);
 		(void)sigprocmask(SIG_SETMASK, &omask, NULL);
 		/* execve(_PATH_BSHELL, __UNCONST(argp), environ); */
-		if (waitpid(pid, &status, 0) != -1) {
+		/* waitpid here or later?
+		  if (waitpid(pid, &status, 0) != -1) {
 			_exit(127);
-		} /* else perror? */
+		*/
+		_exit(127);
+		/* } else perror? */
 	} else {
 		/* error */
 		(void)__unlockenv();
@@ -109,7 +125,7 @@ system(const char *command)
 		(void)sigprocmask(SIG_SETMASK, &omask, NULL);
 		return -1;	
 	}
-	/* switch(status /\* pid = vfork() *\/) {  */
+	/* switch(pid = vfork()) {  */
 	/* case -1:			/\* error *\/ */
 	/* 	(void)__unlockenv(); */
 	/* 	sigaction(SIGINT, &intsa, NULL); */
