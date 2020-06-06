@@ -55,6 +55,7 @@ __RCSID("$NetBSD: popen.c,v 1.36 2019/01/24 18:01:38 christos Exp $");
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <spawn.h>
 
 #include "env.h"
 
@@ -198,8 +199,15 @@ popen(const char *cmd, const char *type)
 
 	MUTEX_LOCK();
 	(void)__readlockenv();
-	switch (pid = vfork()) {
-	case -1:			/* Error. */
+        int status;
+	status = posix_spawn(&pid, _PATH_BSHELL, NULL, NULL, __UNCONST(cmd), environ);
+	if (status == 0) {
+		/* Child. */
+		pdes_child(pdes, type);
+		_exit(127);
+		/* NOTREACHED */
+	} else {
+		/* Error. */
 		serrno = errno;
 		(void)__unlockenv();
 		MUTEX_UNLOCK();
@@ -207,12 +215,22 @@ popen(const char *cmd, const char *type)
 		errno = serrno;
 		return NULL;
 		/* NOTREACHED */
-	case 0:				/* Child. */
-		pdes_child(pdes, type);
-		execl(_PATH_BSHELL, "sh", "-c", cmd, NULL);
-		_exit(127);
-		/* NOTREACHED */
 	}
+	/* switch (pid = vfork()) { */
+	/* case -1:			/\* Error. *\/ */
+	/* 	serrno = errno; */
+	/* 	(void)__unlockenv(); */
+	/* 	MUTEX_UNLOCK(); */
+	/* 	pdes_error(pdes, cur); */
+	/* 	errno = serrno; */
+	/* 	return NULL; */
+	/* 	/\* NOTREACHED *\/ */
+	/* case 0:				/\* Child. *\/ */
+	/* 	pdes_child(pdes, type); */
+	/* 	execl(_PATH_BSHELL, "sh", "-c", cmd, NULL); */
+	/* 	_exit(127); */
+	/* 	/\* NOTREACHED *\/ */
+	/* } */
 	(void)__unlockenv();
 
 	pdes_parent(pdes, cur, pid, type);
