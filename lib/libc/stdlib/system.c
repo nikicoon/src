@@ -59,6 +59,8 @@ system(const char *command)
 	int pstat;
 	const char *argp[] = {"sh", "-c", NULL, NULL};
 	argp[2] = command;
+        posix_spawnattr_t attr;
+        int status;
 
 	/*
 	 * ISO/IEC 9899:1999 in 7.20.4.6 describes this special case.
@@ -90,41 +92,12 @@ system(const char *command)
 	}
 
 	(void)__readlockenv();
-	int status;
-	status = posix_spawn(&pid, _PATH_BSHELL, NULL, NULL, __UNCONST(argp), environ);
-	/*
-	 * IEEE Std 1003.1-2017, 16.371: Upon successful completion,
-	 * posix_spawn() and posix_spawnp() shall return the process
-	 * ID of the child process to the parent process, in the
-	 * variable pointed to by a non-NULL pid argument, and shall
-	 * return zero as the function return value. Otherwise, no
-	 * child process shall be created, the value stored into the
-	 * variable pointed to by a non-NULL pid is unspecified, and
-	 * an error number shall be returned as the function return
-	 * value to indicate the error. If the pid argument is a null
-	 * pointer, the process ID of the child is not returned to the
-	 * caller.
-	 */
-	if (status == 0) {
-		/* child */
-		sigaction(SIGINT, &intsa, NULL);
-		sigaction(SIGQUIT, &quitsa, NULL);
-		(void)sigprocmask(SIG_SETMASK, &omask, NULL);
-		/* execve(_PATH_BSHELL, __UNCONST(argp), environ); */
-		/* waitpid here or later?
-		  if (waitpid(pid, &status, 0) != -1) {
-			_exit(127);
-		*/
-		_exit(127);
-		/* } else perror? */
-	} else {
-		/* error */
-		(void)__unlockenv();
-		sigaction(SIGINT, &intsa, NULL);
-		sigaction(SIGQUIT, &quitsa, NULL);
-		(void)sigprocmask(SIG_SETMASK, &omask, NULL);
-		return -1;	
-	}
+	posix_spawnattr_init(&attr);
+	posix_spawnattr_setsigmask(&attr, &omask);
+	posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSIGDEF|POSIX_SPAWN_SETSIGMASK);
+	status = posix_spawn(&pid, _PATH_BSHELL, NULL, &attr, __UNCONST(argp), environ);
+	posix_spawnattr_destroy(&attr);
+
 	/* switch(pid = vfork()) {  */
 	/* case -1:			/\* error *\/ */
 	/* 	(void)__unlockenv(); */
@@ -141,10 +114,12 @@ system(const char *command)
 	/* } */
 	(void)__unlockenv();
 
-	while (waitpid(pid, &pstat, 0) == -1) {
-		if (errno != EINTR) {
-			pstat = -1;
-			break;
+	if (status == 0) {
+		while (waitpid(pid, &pstat, 0) == -1) {
+			if (errno != EINTR) {
+				pstat = -1;
+				break;
+			}
 		}
 	}
 
