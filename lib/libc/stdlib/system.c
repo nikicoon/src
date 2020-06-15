@@ -97,21 +97,6 @@ system(const char *command)
 	posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSIGDEF|POSIX_SPAWN_SETSIGMASK);
 	status = posix_spawn(&pid, _PATH_BSHELL, NULL, &attr, __UNCONST(argp), environ);
 	posix_spawnattr_destroy(&attr);
-
-	/* switch(pid = vfork()) {  */
-	/* case -1:			/\* error *\/ */
-	/* 	(void)__unlockenv(); */
-	/* 	sigaction(SIGINT, &intsa, NULL); */
-	/* 	sigaction(SIGQUIT, &quitsa, NULL); */
-	/* 	(void)sigprocmask(SIG_SETMASK, &omask, NULL); */
-	/* 	return -1; */
-	/* case 0:				/\* child *\/ */
-	/* 	sigaction(SIGINT, &intsa, NULL); */
-	/* 	sigaction(SIGQUIT, &quitsa, NULL); */
-	/* 	(void)sigprocmask(SIG_SETMASK, &omask, NULL); */
-	/* 	execve(_PATH_BSHELL, __UNCONST(argp), environ); */
-	/* 	_exit(127); */
-	/* } */
 	(void)__unlockenv();
 
 	if (status == 0) {
