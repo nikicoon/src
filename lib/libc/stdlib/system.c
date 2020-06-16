@@ -91,13 +91,13 @@ system(const char *command)
 		return -1;
 	}
 
-	(void)__readlockenv();
 	posix_spawnattr_init(&attr);
 	posix_spawnattr_setsigmask(&attr, &omask);
 	posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSIGDEF|POSIX_SPAWN_SETSIGMASK);
+	(void)__readlockenv();
 	status = posix_spawn(&pid, _PATH_BSHELL, NULL, &attr, __UNCONST(argp), environ);
-	posix_spawnattr_destroy(&attr);
 	(void)__unlockenv();
+	posix_spawnattr_destroy(&attr);
 
 	if (status == 0) {
 		while (waitpid(pid, &pstat, 0) == -1) {
