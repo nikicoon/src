@@ -71,8 +71,8 @@ static struct pid {
 	int fd;
 #endif
 	pid_t pid;
-} *pidlist; 
-	
+} *pidlist;
+
 #ifdef _REENTRANT
 static  mutex_t pidlist_mutex = MUTEX_INITIALIZER;
 # define MUTEX_LOCK() \
@@ -117,13 +117,26 @@ pdes_get(int *pdes, const char **type)
 	return NULL;
 }
 
-static void
-pdes_child(int *pdes, const char *type)
+/*
+ * 1. Lock pidlist_mutex
+ * 2. Create file action list for all concurrent popen() instances
+ *    and the side of the pipe not necessary and the move to stdin/stdout.
+ * 3. Unlock pidlist_mutex
+ * 4 return list, free in parent.
+ */
+static int
+pdes_child(int *pdes, const char *type, const char *cmd)
 {
 	struct pid *old;
+	posix_spawn_file_actions_t file_action_obj;
+	pid_t pid;
+	const char *pargv[] = {"sh", "-c", NULL, NULL};
+	pargv[2] = cmd;
+	int serrno = 0;
+
 
 	/* POSIX.2 B.3.2.2 "popen() shall ensure that any streams
-	   from previous popen() calls that remain open in the 
+	   from previous popen() calls that remain open in the
 	   parent process are closed in the new child process. */
 	for (old = pidlist; old; old = old->next)
 #ifdef _REENTRANT
@@ -132,20 +145,39 @@ pdes_child(int *pdes, const char *type)
 		(void)close(fileno(old->fp)); /* don't allow a flush */
 #endif
 
-	if (type[0] == 'r') {
-		(void)close(pdes[0]);
+	MUTEX_LOCK();
+	/* TODO: The posix_spawn_file_actions_init() function shall
+	 * fail if ENOMEM.
+	 */
+	/* init the object referenced by _file_actions.
+	 */
+	if (posix_spawn_file_actions_init(&file_action_obj) != 0) {
+	    if (type[0] == 'r') {
+	    	(void)close(pdes[0]);
 		if (pdes[1] != STDOUT_FILENO) {
-			(void)dup2(pdes[1], STDOUT_FILENO);
-			(void)close(pdes[1]);
+			(void)posix_spawn_file_actions_adddup2(&file_action_obj, pdes[1], STDOUT_FILENO);
+			(void)posix_spawn_file_actions_addclose(&file_action_obj, pdes[1]);
 		}
 		if (type[1] == '+')
-			(void)dup2(STDOUT_FILENO, STDIN_FILENO);
-	} else {
-		(void)close(pdes[1]);
-		if (pdes[0] != STDIN_FILENO) {
-			(void)dup2(pdes[0], STDIN_FILENO);
-			(void)close(pdes[0]);
+			(void)posix_spawn_file_actions_adddup2(&file_action_obj, STDOUT_FILENO, STDIN_FILENO);
+		} else {
+			(void)posix_spawn_file_actions_addclose(&file_action_obj, pdes[1]);
+			if (pdes[0] != STDIN_FILENO) {
+				(void)posix_spawn_file_actions_adddup2(&file_action_obj, pdes[0], STDIN_FILENO);
+				(void)posix_spawn_file_actions_addclose(&file_action_obj, pdes[0]);
+			}
 		}
+	}
+	(void)__readlockenv();
+	if (0 != posix_spawn(&pid, _PATH_BSHELL, &file_action_obj, 0, __UNCONST(pargv), environ))
+		 serrno = -1;
+	(void)__unlockenv();
+	MUTEX_UNLOCK();
+	posix_spawn_file_actions_destroy(&file_action_obj);
+	if (serrno == 0) {
+		return pid;
+	} else {
+		return serrno;
 	}
 }
 
@@ -199,14 +231,8 @@ popen(const char *cmd, const char *type)
 
 	MUTEX_LOCK();
 	(void)__readlockenv();
-        int status;
-	status = posix_spawn(&pid, _PATH_BSHELL, NULL, NULL, __UNCONST(cmd), environ);
-	if (status == 0) {
-		/* Child. */
-		pdes_child(pdes, type);
-		_exit(127);
-		/* NOTREACHED */
-	} else {
+	pid = pdes_child(pdes, type, cmd);
+	if (pid == -1) {
 		/* Error. */
 		serrno = errno;
 		(void)__unlockenv();
@@ -216,21 +242,6 @@ popen(const char *cmd, const char *type)
 		return NULL;
 		/* NOTREACHED */
 	}
-	/* switch (pid = vfork()) { */
-	/* case -1:			/\* Error. *\/ */
-	/* 	serrno = errno; */
-	/* 	(void)__unlockenv(); */
-	/* 	MUTEX_UNLOCK(); */
-	/* 	pdes_error(pdes, cur); */
-	/* 	errno = serrno; */
-	/* 	return NULL; */
-	/* 	/\* NOTREACHED *\/ */
-	/* case 0:				/\* Child. *\/ */
-	/* 	pdes_child(pdes, type); */
-	/* 	execl(_PATH_BSHELL, "sh", "-c", cmd, NULL); */
-	/* 	_exit(127); */
-	/* 	/\* NOTREACHED *\/ */
-	/* } */
 	(void)__unlockenv();
 
 	pdes_parent(pdes, cur, pid, type);
@@ -263,7 +274,7 @@ popenve(const char *cmd, char *const *argv, char *const *envp, const char *type)
 		return NULL;
 		/* NOTREACHED */
 	case 0:				/* Child. */
-		pdes_child(pdes, type);
+		pdes_child(pdes, type, cmd);
 		execve(cmd, argv, envp);
 		_exit(127);
 		/* NOTREACHED */
