@@ -130,9 +130,11 @@ pdes_child(int *pdes, const char *type, const char *cmd)
 	struct pid *old;
 	posix_spawn_file_actions_t file_action_obj;
 	pid_t pid;
-	const char *pargv[] = {"sh", "-c", NULL, NULL};
-	pargv[2] = cmd;
-	int serrno = 0;
+	const char *argp[] = {"sh", "-c", NULL, NULL};
+	argp[2] = cmd;
+	int e;
+	int error;
+	int errorSpawn;
 
 
 	/* POSIX.2 B.3.2.2 "popen() shall ensure that any streams
@@ -146,39 +148,59 @@ pdes_child(int *pdes, const char *type, const char *cmd)
 #endif
 
 	MUTEX_LOCK();
-	/* TODO: The posix_spawn_file_actions_init() function shall
-	 * fail if ENOMEM.
-	 */
-	/* init the object referenced by _file_actions.
-	 */
-	if (posix_spawn_file_actions_init(&file_action_obj) != 0) {
-	    if (type[0] == 'r') {
-	    	(void)close(pdes[0]);
+	error = posix_spawn_file_actions_init(&file_action_obj);
+	if (error != 0) {
+		e = errno;
+		goto fail;
+	}
+	if (type[0] == 'r') {
+		(void)close(pdes[0]);
 		if (pdes[1] != STDOUT_FILENO) {
-			(void)posix_spawn_file_actions_adddup2(&file_action_obj, pdes[1], STDOUT_FILENO);
-			(void)posix_spawn_file_actions_addclose(&file_action_obj, pdes[1]);
+			if (posix_spawn_file_actions_adddup2(&file_action_obj, pdes[1], STDOUT_FILENO) != 0) {
+				e = errno;
+				goto fail;
+			}
+			if (posix_spawn_file_actions_addclose(&file_action_obj, pdes[1]) != 0) {
+				e = errno;
+				goto fail;
+			}
 		}
-		if (type[1] == '+')
-			(void)posix_spawn_file_actions_adddup2(&file_action_obj, STDOUT_FILENO, STDIN_FILENO);
-		} else {
-			(void)posix_spawn_file_actions_addclose(&file_action_obj, pdes[1]);
-			if (pdes[0] != STDIN_FILENO) {
-				(void)posix_spawn_file_actions_adddup2(&file_action_obj, pdes[0], STDIN_FILENO);
-				(void)posix_spawn_file_actions_addclose(&file_action_obj, pdes[0]);
+		if (type[1] == '+') {
+			if (posix_spawn_file_actions_adddup2(&file_action_obj, STDOUT_FILENO, STDIN_FILENO) != 0) {
+				e = errno;
+				goto fail;
+			}
+		}
+	} else {
+		if (posix_spawn_file_actions_addclose(&file_action_obj, pdes[1]) != 0) {
+			e = errno;
+			goto fail;
+		}
+		if (pdes[0] != STDIN_FILENO) {
+			if (posix_spawn_file_actions_adddup2(&file_action_obj, pdes[0], STDIN_FILENO) != 0) {
+				e = errno;
+				goto fail;
+			}
+			if (posix_spawn_file_actions_addclose(&file_action_obj, pdes[0]) != 0) {
+				e = errno;
+				goto fail;
 			}
 		}
 	}
 	(void)__readlockenv();
-	if (0 != posix_spawn(&pid, _PATH_BSHELL, &file_action_obj, 0, __UNCONST(pargv), environ))
-		 serrno = -1;
+	errorSpawn = posix_spawn(&pid, _PATH_BSHELL, &file_action_obj, 0, __UNCONST(argp), environ);
+	if (errorSpawn != 0) {
+		 e = errno;
+		 goto fail;
+	 }
 	(void)__unlockenv();
 	MUTEX_UNLOCK();
 	posix_spawn_file_actions_destroy(&file_action_obj);
-	if (serrno == 0) {
-		return pid;
-	} else {
-		return serrno;
-	}
+	return pid;
+
+fail:
+	errno = e;
+	return -1;
 }
 
 static void
@@ -265,18 +287,14 @@ popenve(const char *cmd, char *const *argv, char *const *envp, const char *type)
 		return NULL;
 
 	MUTEX_LOCK();
-	switch (pid = vfork()) {
-	case -1:			/* Error. */
+	pid = pdes_child(pdes, type, cmd);
+	if (pid == -1) {
+		/* Error. */
 		serrno = errno;
 		MUTEX_UNLOCK();
 		pdes_error(pdes, cur);
 		errno = serrno;
 		return NULL;
-		/* NOTREACHED */
-	case 0:				/* Child. */
-		pdes_child(pdes, type, cmd);
-		execve(cmd, argv, envp);
-		_exit(127);
 		/* NOTREACHED */
 	}
 
