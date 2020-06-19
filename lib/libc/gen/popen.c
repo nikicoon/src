@@ -132,10 +132,7 @@ pdes_child(int *pdes, const char *type, const char *cmd)
 	pid_t pid;
 	const char *argp[] = {"sh", "-c", NULL, NULL};
 	argp[2] = cmd;
-	int e;
 	int error;
-	int errorSpawn;
-
 
 	/* POSIX.2 B.3.2.2 "popen() shall ensure that any streams
 	   from previous popen() calls that remain open in the
@@ -149,57 +146,50 @@ pdes_child(int *pdes, const char *type, const char *cmd)
 
 	MUTEX_LOCK();
 	error = posix_spawn_file_actions_init(&file_action_obj);
-	if (error != 0) {
-		e = errno;
+	if (error)
 		goto fail;
-	}
 	if (type[0] == 'r') {
 		(void)close(pdes[0]);
 		if (pdes[1] != STDOUT_FILENO) {
-			if (posix_spawn_file_actions_adddup2(&file_action_obj, pdes[1], STDOUT_FILENO) != 0) {
-				e = errno;
+			error = posix_spawn_file_actions_adddup2(&file_action_obj, pdes[1], STDOUT_FILENO);
+			if (error)
 				goto fail;
-			}
-			if (posix_spawn_file_actions_addclose(&file_action_obj, pdes[1]) != 0) {
-				e = errno;
+			error = posix_spawn_file_actions_addclose(&file_action_obj, pdes[1]);
+			if (error)
 				goto fail;
-			}
 		}
 		if (type[1] == '+') {
-			if (posix_spawn_file_actions_adddup2(&file_action_obj, STDOUT_FILENO, STDIN_FILENO) != 0) {
-				e = errno;
+			error = posix_spawn_file_actions_adddup2(&file_action_obj, STDOUT_FILENO, STDIN_FILENO);
+			if (error)
 				goto fail;
-			}
 		}
 	} else {
-		if (posix_spawn_file_actions_addclose(&file_action_obj, pdes[1]) != 0) {
-			e = errno;
+		error = posix_spawn_file_actions_addclose(&file_action_obj, pdes[1]);
+		if (error)
 			goto fail;
-		}
 		if (pdes[0] != STDIN_FILENO) {
-			if (posix_spawn_file_actions_adddup2(&file_action_obj, pdes[0], STDIN_FILENO) != 0) {
-				e = errno;
+			error = posix_spawn_file_actions_adddup2(&file_action_obj, pdes[0], STDIN_FILENO);
+			if (error)
 				goto fail;
-			}
-			if (posix_spawn_file_actions_addclose(&file_action_obj, pdes[0]) != 0) {
-				e = errno;
+			error = posix_spawn_file_actions_addclose(&file_action_obj, pdes[0]);
+			if (error)
 				goto fail;
-			}
 		}
 	}
 	(void)__readlockenv();
-	errorSpawn = posix_spawn(&pid, _PATH_BSHELL, &file_action_obj, 0, __UNCONST(argp), environ);
-	if (errorSpawn != 0) {
-		 e = errno;
-		 goto fail;
-	 }
+	error = posix_spawn(&pid, _PATH_BSHELL, &file_action_obj, 0, __UNCONST(argp), environ);
+	if (error) {
+		(void)__unlockenv();
+		goto fail;
+	}
 	(void)__unlockenv();
 	MUTEX_UNLOCK();
 	posix_spawn_file_actions_destroy(&file_action_obj);
 	return pid;
 
 fail:
-	errno = e;
+	MUTEX_UNLOCK();
+	errno = error;
 	return -1;
 }
 
