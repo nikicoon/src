@@ -146,7 +146,7 @@ pdes_child(int *pdes, const char *type, const char *cmd)
 
 	MUTEX_LOCK();
 	error = posix_spawn_file_actions_init(&file_action_obj);
-	if (error)
+	if (!error)
 		goto fail;
 	if (type[0] == 'r') {
 		(void)close(pdes[0]);
