@@ -185,8 +185,10 @@ pdes_child(int *pdes, const char *type, const char *cmd)
 	(void)__unlockenv();
 	MUTEX_UNLOCK();
 	error = posix_spawn_file_actions_destroy(&file_action_obj);
-	if (!error)
-		goto fail;
+	if (!error) {
+		errno = error;
+		return -1;
+	}
 	return pid;
 
 fail:
