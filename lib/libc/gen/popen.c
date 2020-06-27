@@ -206,6 +206,7 @@ pdes_child(int *pdes, const char *type, const char *cmd)
 	 * leak the pid.
 	 */
 	if (error) {
+		fprintf(stderr, "%s:%d error=%d\n", __func__, __LINE__, error);
 		errno = error;
 		return -1;
 	}
@@ -222,20 +223,24 @@ pdes_parent(int *pdes, struct pid *cur, pid_t pid, const char *type)
 {
 	FILE *iop;
 
+	fprintf(stderr, "%s", fdopen(pdes[0], type));
 	/* Parent; assume fdopen can't fail. */
 	if (*type == 'r') {
 		iop = fdopen(pdes[0], type);
+		fprintf(stderr, "%s", iop);
 #ifdef _REENTRANT
 		cur->fd = pdes[0];
 #endif
 		(void)close(pdes[1]);
 	} else {
 		iop = fdopen(pdes[1], type);
+		fprintf(stderr, "%s", iop);
 #ifdef _REENTRANT
 		cur->fd = pdes[1];
 #endif
 		(void)close(pdes[0]);
 	}
+	fprintf(stderr, "%s", fdopen(pdes[0], type));
 
 	/* Link into list of file descriptors. */
 	cur->fp = iop;
