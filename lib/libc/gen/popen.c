@@ -223,24 +223,24 @@ pdes_parent(int *pdes, struct pid *cur, pid_t pid, const char *type)
 {
 	FILE *iop;
 
-	fprintf(stderr, "%s", fdopen(pdes[0], type));
+	fprintf(stderr, "pdes[0]=%d type=\"%s\"\n", pdes[0], type);
 	/* Parent; assume fdopen can't fail. */
 	if (*type == 'r') {
 		iop = fdopen(pdes[0], type);
-		fprintf(stderr, "%s", iop);
+		fprintf(stderr, "%p\n", iop);
 #ifdef _REENTRANT
 		cur->fd = pdes[0];
 #endif
 		(void)close(pdes[1]);
 	} else {
 		iop = fdopen(pdes[1], type);
-		fprintf(stderr, "%s", iop);
+		fprintf(stderr, "%p\n", iop);
 #ifdef _REENTRANT
 		cur->fd = pdes[1];
 #endif
 		(void)close(pdes[0]);
 	}
-	fprintf(stderr, "%s", fdopen(pdes[0], type));
+	fprintf(stderr, "pdes[0]=%d type=\"%s\"\n", pdes[0], type);
 
 	/* Link into list of file descriptors. */
 	cur->fp = iop;
