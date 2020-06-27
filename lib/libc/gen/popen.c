@@ -151,7 +151,11 @@ pdes_child(int *pdes, const char *type, const char *cmd)
 		goto fail;
 	}
 	if (type[0] == 'r') {
-		// (void)close(pdes[0]);
+		error = posix_spawn_file_actions_addclose(&file_action_obj, pdes[0]);
+		if (error) {
+			fprintf(stderr, "%s:%d error=%d\n", __func__, __LINE__, error);
+			goto fail;
+		}
 		if (pdes[1] != STDOUT_FILENO) {
 			error = posix_spawn_file_actions_adddup2(&file_action_obj, pdes[1], STDOUT_FILENO);
 			if (error) {
