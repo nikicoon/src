@@ -145,12 +145,14 @@ pdes_child(int *pdes, const char *type, const char *cmd)
 	for (old = pidlist; old; old = old->next)
 #ifdef _REENTRANT
 	error = posix_spawn_file_actions_addclose(&file_action_obj, old->fd); /* don't allow a flush */
-	if (error)
+	if (error) {
 		goto fail;
+	}
 #else
 	error = posix_spawn_file_actions_addclose(&file_action_obj, fileno(old->fp)); /* don't allow a flush */
-	if (error)
+	if (error) {
 		goto fail;
+	}
 #endif
 	if (type[0] == 'r') {
 		error = posix_spawn_file_actions_addclose(&file_action_obj, pdes[0]);
