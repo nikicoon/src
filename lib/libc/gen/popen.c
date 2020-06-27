@@ -144,7 +144,6 @@ pdes_child(int *pdes, const char *type, const char *cmd)
 		(void)close(fileno(old->fp)); /* don't allow a flush */
 #endif
 
-	MUTEX_LOCK();
 	error = posix_spawn_file_actions_init(&file_action_obj);
 	if (error) {
 		fprintf(stderr, "%s:%d error=%d\n", __func__, __LINE__, error);
@@ -203,7 +202,6 @@ pdes_child(int *pdes, const char *type, const char *cmd)
 		goto fail;
 	}
 	(void)__unlockenv();
-	MUTEX_UNLOCK();
 	error = posix_spawn_file_actions_destroy(&file_action_obj);
 	/* 
 	 * TODO: if _destroy() fails we have to go on, otherwise we
@@ -217,7 +215,6 @@ pdes_child(int *pdes, const char *type, const char *cmd)
 	return pid;
 
 fail:
-	MUTEX_UNLOCK();
 	errno = error;
 	return -1;
 }
