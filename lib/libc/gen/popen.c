@@ -192,6 +192,7 @@ pdes_child(int *pdes, const char *type, const char *cmd)
 	}
 	(void)__readlockenv();
 	error = posix_spawn(&pid, _PATH_BSHELL, &file_action_obj, 0, __UNCONST(argp), environ);
+	fprintf(stderr, "%d", pid);
 	if (error) {
 		fprintf(stderr, "%s:%d error=%d\n", __func__, __LINE__, error);
 		(void)__unlockenv();
