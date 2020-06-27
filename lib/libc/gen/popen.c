@@ -221,6 +221,7 @@ pdes_child(int *pdes, const char *type, const char *cmd)
 
 fail:
 	errno = error;
+	posix_spawn_file_actions_destroy(&file_action_obj);
 	return -1;
 }
 
