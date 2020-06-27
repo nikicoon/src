@@ -134,21 +134,24 @@ pdes_child(int *pdes, const char *type, const char *cmd)
 	argp[2] = cmd;
 	int error;
 
-	/* POSIX.2 B.3.2.2 "popen() shall ensure that any streams
-	   from previous popen() calls that remain open in the
-	   parent process are closed in the new child process. */
-	for (old = pidlist; old; old = old->next)
-#ifdef _REENTRANT
-		(void)close(old->fd); /* don't allow a flush */
-#else
-		(void)close(fileno(old->fp)); /* don't allow a flush */
-#endif
-
 	error = posix_spawn_file_actions_init(&file_action_obj);
 	if (error) {
 		fprintf(stderr, "%s:%d error=%d\n", __func__, __LINE__, error);
 		goto fail;
 	}
+	/* POSIX.2 B.3.2.2 "popen() shall ensure that any streams
+	   from previous popen() calls that remain open in the
+	   parent process are closed in the new child process. */
+	for (old = pidlist; old; old = old->next)
+#ifdef _REENTRANT
+	error = posix_spawn_file_actions_addclose(&file_action_obj, old->fd); /* don't allow a flush */
+	if (error)
+		goto fail;
+#else
+	error = posix_spawn_file_actions_addclose(&file_action_obj, fileno(old->fp)); /* don't allow a flush */
+	if (error)
+		goto fail;
+#endif
 	if (type[0] == 'r') {
 		error = posix_spawn_file_actions_addclose(&file_action_obj, pdes[0]);
 		if (error) {
