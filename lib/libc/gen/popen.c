@@ -136,7 +136,6 @@ pdes_child(int *pdes, const char *type, const char *cmd)
 
 	error = posix_spawn_file_actions_init(&file_action_obj);
 	if (error) {
-		fprintf(stderr, "%s:%d error=%d\n", __func__, __LINE__, error);
 		goto fail;
 	}
 	/* POSIX.2 B.3.2.2 "popen() shall ensure that any streams
@@ -157,63 +156,53 @@ pdes_child(int *pdes, const char *type, const char *cmd)
 	if (type[0] == 'r') {
 		error = posix_spawn_file_actions_addclose(&file_action_obj, pdes[0]);
 		if (error) {
-			fprintf(stderr, "%s:%d error=%d\n", __func__, __LINE__, error);
 			goto fail;
 		}
 		if (pdes[1] != STDOUT_FILENO) {
 			error = posix_spawn_file_actions_adddup2(&file_action_obj, pdes[1], STDOUT_FILENO);
 			if (error) {
-				fprintf(stderr, "%s:%d error=%d\n", __func__, __LINE__, error);
 				goto fail;
 			}
 			error = posix_spawn_file_actions_addclose(&file_action_obj, pdes[1]);
 			if (error) {
-				fprintf(stderr, "%s:%d error=%d\n", __func__, __LINE__, error);
 				goto fail;
 			}
 		}
 		if (type[1] == '+') {
 			error = posix_spawn_file_actions_adddup2(&file_action_obj, STDOUT_FILENO, STDIN_FILENO);
 			if (error) {
-				fprintf(stderr, "%s:%d error=%d\n", __func__, __LINE__, error);
 				goto fail;
 			}
 		}
 	} else {
 		error = posix_spawn_file_actions_addclose(&file_action_obj, pdes[1]);
 		if (error) {
-			fprintf(stderr, "%s:%d error=%d\n", __func__, __LINE__, error);
 			goto fail;
 		}
 		if (pdes[0] != STDIN_FILENO) {
 			error = posix_spawn_file_actions_adddup2(&file_action_obj, pdes[0], STDIN_FILENO);
 			if (error) {
-				fprintf(stderr, "%s:%d error=%d\n", __func__, __LINE__, error);
 				goto fail;
 			}
 			error = posix_spawn_file_actions_addclose(&file_action_obj, pdes[0]);
 			if (error) {
-				fprintf(stderr, "%s:%d error=%d\n", __func__, __LINE__, error);
 				goto fail;
 			}
 		}
 	}
 	(void)__readlockenv();
 	error = posix_spawn(&pid, _PATH_BSHELL, &file_action_obj, 0, __UNCONST(argp), environ);
-	fprintf(stderr, "%d", pid);
 	if (error) {
-		fprintf(stderr, "%s:%d error=%d\n", __func__, __LINE__, error);
 		(void)__unlockenv();
 		goto fail;
 	}
 	(void)__unlockenv();
 	error = posix_spawn_file_actions_destroy(&file_action_obj);
-	/* 
+	/*
 	 * TODO: if _destroy() fails we have to go on, otherwise we
 	 * leak the pid.
 	 */
 	if (error) {
-		fprintf(stderr, "%s:%d error=%d\n", __func__, __LINE__, error);
 		errno = error;
 		return -1;
 	}
