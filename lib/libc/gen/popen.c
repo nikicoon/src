@@ -117,13 +117,6 @@ pdes_get(int *pdes, const char **type)
 	return NULL;
 }
 
-/*
- * 1. Lock pidlist_mutex
- * 2. Create file action list for all concurrent popen() instances
- *    and the side of the pipe not necessary and the move to stdin/stdout.
- * 3. Unlock pidlist_mutex
- * 4 return list, free in parent.
- */
 static int
 pdes_child(int *pdes, const char *type, const char *cmd)
 {
