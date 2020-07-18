@@ -56,6 +56,8 @@ __RCSID("$NetBSD: eval.c,v 1.181 2020/08/20 23:09:56 kre Exp $");
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/sysctl.h>
+#include <spawn.h>
+#include <paths.h>
 
 /*
  * Evaluate a command.
@@ -1117,15 +1119,20 @@ evalcommand(union node *cmd, int flgs, struct backcmd *backcmd)
 			localvars = NULL;
 			vforked = 1;
 	VFORK_BLOCK
-			switch (pid = vfork()) {
-			case -1:
+			envp = environment();
+			int status;
+			status = posix_spawn(&pid, _PATH_BSHELL, NULL, NULL, __UNCONST(argv), envp);
+			// pid = vfork() case -1
+			if (status) {
+				/* Error */
 				serrno = errno;
-				VTRACE(DBG_EVAL, ("vfork() failed, errno=%d\n",
-				    serrno));
+				VTRACE(DBG_EVAL, ("posix_spawn() failed, errno=%d\n", serrno));
 				INTON;
-				error("Cannot vfork (%s)", strerror(serrno));
-				break;
-			case 0:
+				error("Cannot posix_spawn (%s)", strerror(serrno));
+				fprintf(stderr, "%s:%d error=%d\n", __func__, __LINE__, errno);
+			}
+			// pid = vfork() case 0
+			if (pid) {
 				/* Make sure that exceptions only unwind to
 				 * after the vfork(2)
 				 */
@@ -1150,26 +1157,26 @@ evalcommand(union node *cmd, int flgs, struct backcmd *backcmd)
 				listmklocal(varlist.list,
 				    VDOEXPORT | VEXPORT | VNOFUNC);
 				forkchild(jp, cmd, mode, vforked);
-				break;
-			default:
-				VFORK_UNDO();
-						/* restore from vfork(2) */
-				CTRACE(DBG_PROCS|DBG_CMDS,
-				    ("parent after vfork - vforked=%d\n",
-				      vforked));
-				handler = savehandler;
-				poplocalvars();
-				localvars = savelocalvars;
-				if (vforked == 2) {
-					vforked = 0;
+			}
+			// default case
+			VFORK_UNDO();
+			/* restore from vfork(2) */
+			CTRACE(DBG_PROCS|DBG_CMDS,
+			    ("parent after vfork - vforked=%d\n",
+			      vforked));
+			handler = savehandler;
+			poplocalvars();
+			localvars = savelocalvars;
+			if (vforked == 2) {
+				vforked = 0;
 
-					(void)waitpid(pid, NULL, 0);
-					/*
-					 * We need to progress in a
-					 * normal fork fashion
-					 */
-					goto normal_fork;
-				}
+				(void)waitpid(pid, NULL, 0);
+				/*
+				 * We need to progress in a
+				 * normal fork fashion
+				 */
+				goto normal_fork;
+				
 				/*
 				 * Here the child has left home,
 				 * getting on with its life, so
@@ -1379,7 +1386,7 @@ evalcommand(union node *cmd, int flgs, struct backcmd *backcmd)
 			memout.buf = NULL;
 		}
 		break;
-
+/*
 	default:
 		VXTRACE(DBG_EVAL, ("normal command%s:  ", vforked?" VF":""),
 		    trargs(argv));
@@ -1391,6 +1398,7 @@ evalcommand(union node *cmd, int flgs, struct backcmd *backcmd)
 		envp = environment();
 		shellexec(argv, envp, path, cmdentry.u.index, vforked);
 		break;
+		*/
 	}
 	goto out;
 
