@@ -118,7 +118,7 @@ pdes_get(int *pdes, const char **type)
 }
 
 static int
-pdes_child(int *pdes, const char *type, const char *cmd)
+pdes_spawn(int *pdes, const char *type, const char *cmd)
 {
 	struct pid *old;
 	posix_spawn_file_actions_t file_action_obj;
@@ -185,20 +185,16 @@ pdes_child(int *pdes, const char *type, const char *cmd)
 	}
 	(void)__readlockenv();
 	error = posix_spawn(&pid, _PATH_BSHELL, &file_action_obj, 0, __UNCONST(argp), environ);
+	(void)__unlockenv();
 	if (error) {
-		(void)__unlockenv();
 		goto fail;
 	}
-	(void)__unlockenv();
 	error = posix_spawn_file_actions_destroy(&file_action_obj);
 	/*
 	 * TODO: if _destroy() fails we have to go on, otherwise we
 	 * leak the pid.
 	 */
-	if (error) {
-		errno = error;
-		return -1;
-	}
+	_DIAGASSERT(error);
 	return pid;
 
 fail:
@@ -257,7 +253,7 @@ popen(const char *cmd, const char *type)
 
 	MUTEX_LOCK();
 	(void)__readlockenv();
-	pid = pdes_child(pdes, type, cmd);
+	pid = pdes_spawn(pdes, type, cmd);
 	if (pid == -1) {
 		/* Error. */
 		serrno = errno;
@@ -291,7 +287,7 @@ popenve(const char *cmd, char *const *argv, char *const *envp, const char *type)
 		return NULL;
 
 	MUTEX_LOCK();
-	pid = pdes_child(pdes, type, cmd);
+	pid = pdes_spawn(pdes, type, cmd);
 	if (pid == -1) {
 		/* Error. */
 		serrno = errno;
