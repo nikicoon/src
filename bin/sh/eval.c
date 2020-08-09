@@ -1120,8 +1120,11 @@ evalcommand(union node *cmd, int flgs, struct backcmd *backcmd)
 			vforked = 1;
 	VFORK_BLOCK
 			envp = environment();
+			fprintf(stderr, "%s:%d value=%d\n", __func__, __LINE__, errno);
 			int status;
 			status = posix_spawn(&pid, _PATH_BSHELL, NULL, NULL, __UNCONST(argv), envp);
+			fprintf(stderr, "%s:%d value=%d\n", __func__, __LINE__, errno);
+			fprintf(stderr, "status:%d\n", status);
 			// pid = vfork() case -1
 			if (status) {
 				/* Error */
@@ -1133,6 +1136,8 @@ evalcommand(union node *cmd, int flgs, struct backcmd *backcmd)
 			}
 			// pid = vfork() case 0
 			if (pid) {
+				fprintf(stderr, "pid:%d, inside pid=vfork() case 0\n", pid);
+				fprintf(stderr, "%s:%d error=%d\n", __func__, __LINE__, errno);
 				/* Make sure that exceptions only unwind to
 				 * after the vfork(2)
 				 */
@@ -1159,6 +1164,7 @@ evalcommand(union node *cmd, int flgs, struct backcmd *backcmd)
 				forkchild(jp, cmd, mode, vforked);
 			}
 			// default case
+			fprintf(stderr, "VFORK_UNDO()\n");
 			VFORK_UNDO();
 			/* restore from vfork(2) */
 			CTRACE(DBG_PROCS|DBG_CMDS,
@@ -1169,12 +1175,14 @@ evalcommand(union node *cmd, int flgs, struct backcmd *backcmd)
 			localvars = savelocalvars;
 			if (vforked == 2) {
 				vforked = 0;
-
+				fprintf(stderr, "%s:%d error=%d\n", __func__, __LINE__, errno);
+				fprintf(stderr, "pid:%d\n", pid);
 				(void)waitpid(pid, NULL, 0);
 				/*
 				 * We need to progress in a
 				 * normal fork fashion
 				 */
+				fprintf(stderr, "goto normal_fork\n");
 				goto normal_fork;
 				
 				/*
@@ -1184,6 +1192,7 @@ evalcommand(union node *cmd, int flgs, struct backcmd *backcmd)
 				 */
 				vforked = 0;
 				forkparent(jp, cmd, mode, pid);
+				fprintf(stderr, "goto parent\n");
 				goto parent;
 			}
 	VFORK_END
@@ -1386,8 +1395,10 @@ evalcommand(union node *cmd, int flgs, struct backcmd *backcmd)
 			memout.buf = NULL;
 		}
 		break;
-/*
+
 	default:
+		fprintf(stderr, "Reached default CMD switch\n");
+		fprintf(stderr, "%s:%d error=%d\n", __func__, __LINE__, errno);
 		VXTRACE(DBG_EVAL, ("normal command%s:  ", vforked?" VF":""),
 		    trargs(argv));
 		redirect(cmd->ncmd.redirect, 
@@ -1396,9 +1407,9 @@ evalcommand(union node *cmd, int flgs, struct backcmd *backcmd)
 			for (sp = varlist.list ; sp ; sp = sp->next)
 				setvareq(sp->text, VDOEXPORT|VEXPORT|VSTACK);
 		envp = environment();
-		shellexec(argv, envp, path, cmdentry.u.index, vforked);
+		// shellexec(argv, envp, path, cmdentry.u.index, vforked);
 		break;
-		*/
+
 	}
 	goto out;
 
