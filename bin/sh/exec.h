@@ -64,6 +64,7 @@ struct cmdentry {
 extern const char *pathopt;	/* set by padvance */
 
 void shellexec(char **, char **, const char *, int, int) __dead;
+int tryspawn(pid_t, char **, char **, const char *, int, int); 
 char *padvance(const char **, const char *, int);
 void find_command(char *, struct cmdentry *, int, const char *);
 int (*find_builtin(char *))(int, char **);

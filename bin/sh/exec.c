@@ -49,6 +49,7 @@ __RCSID("$NetBSD: exec.c,v 1.54 2020/08/01 17:51:18 kre Exp $");
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <spawn.h>
 
 /*
  * When commands are first encountered, they are entered in a hash table.
@@ -170,6 +171,56 @@ shellexec(char **argv, char **envp, const char *path, int idx, int vforked)
 	/* NOTREACHED */
 }
 
+
+int
+tryspawn(pid_t pid, char **argv, char **envp, const char *path, int idx, int vforked)
+{
+	char *cmdname;
+        int status;
+        int e;
+	if (strchr(argv[0], '/') != NULL) {
+		status = posix_spawn(&pid, argv[0], NULL, NULL, __UNCONST(argv), envp);
+		return status;
+	} else {
+		e = ENOENT;
+		while ((cmdname = padvance(&path, argv[0], 1)) != NULL) {
+		       if (--idx < 0 && pathopt == NULL) {
+				status = posix_spawn(&pid, cmdname, NULL, NULL, argv, envp);
+				if (status)
+					return status;
+				if (errno != ENOENT && errno != ENOTDIR)
+					e = errno;
+			}
+		       stunalloc(cmdname);
+		}
+	}
+	/* Map to POSIX errors */
+	switch (e) {
+	case EACCES:	/* particularly this (unless no search perm) */
+		/*
+		 * should perhaps check if this EACCES is an exec()
+		 * EACESS or a namei() EACESS - the latter should be 127
+		 * - but not today
+		 */
+	case EINVAL:	/* also explicitly these */
+	case ENOEXEC:
+	default:	/* and anything else */
+		exerrno = 126;
+		break;
+
+	case ENOENT:	/* these are the "pathname lookup failed" errors */
+	case ELOOP:
+	case ENOTDIR:
+	case ENAMETOOLONG:
+		exerrno = 127;
+		break;
+	}
+	CTRACE(DBG_ERRS|DBG_CMDS|DBG_EVAL,
+	    ("shellexec failed for %s, errno %d, vforked %d, suppressint %d\n",
+		argv[0], e, vforked, suppressint));
+	exerror(EXEXEC, "%s: %s", argv[0], errmsg(e, E_EXEC));
+	/* NOTREACHED */
+}
 
 STATIC void
 tryexec(char *cmd, char **argv, char **envp, int vforked)

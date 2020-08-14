@@ -1112,7 +1112,7 @@ evalcommand(union node *cmd, int flgs, struct backcmd *backcmd)
 		 */
 		if (usefork == 0 && cmdentry.cmdtype == CMDNORMAL &&
 		    (!cmd->ncmd.backgnd || cmd->ncmd.redirect == NULL)) {
-			pid_t	pid;
+			pid_t  pid;
 			int serrno;
 
 			savelocalvars = localvars;
@@ -1122,7 +1122,7 @@ evalcommand(union node *cmd, int flgs, struct backcmd *backcmd)
 			envp = environment();
 			fprintf(stderr, "%s:%d value=%d\n", __func__, __LINE__, errno);
 			int status;
-			status = posix_spawn(&pid, _PATH_BSHELL, NULL, NULL, __UNCONST(argv), envp);
+			status = tryspawn(&pid, argv, envp, path, cmdentry.u.index, vforked);
 			fprintf(stderr, "%s:%d value=%d\n", __func__, __LINE__, errno);
 			fprintf(stderr, "status:%d\n", status);
 			// pid = vfork() case -1
