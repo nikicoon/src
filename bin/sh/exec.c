@@ -177,25 +177,23 @@ tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int v
 {
 	char *cmdname;
         int status;
-        int e;
 	if (strchr(argv[0], '/') != NULL) {
 		status = posix_spawn(pidp, argv[0], NULL, NULL, __UNCONST(argv), envp);
 		return status;
 	} else {
-		e = ENOENT;
 		while ((cmdname = padvance(&path, argv[0], 1)) != NULL) {
 		       if (--idx < 0 && pathopt == NULL) {
 				status = posix_spawn(pidp, cmdname, NULL, NULL, argv, envp);
 				if (status)
 					return status;
-				if (errno != ENOENT && errno != ENOTDIR)
-					e = errno;
+				else
+					break;
 			}
 		       stunalloc(cmdname);
 		}
 	}
 	/* Map to POSIX errors */
-	switch (e) {
+	switch (status) {
 	case EACCES:	/* particularly this (unless no search perm) */
 		/*
 		 * should perhaps check if this EACCES is an exec()
@@ -218,7 +216,7 @@ tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int v
 	CTRACE(DBG_ERRS|DBG_CMDS|DBG_EVAL,
 	    ("shellexec failed for %s, errno %d, vforked %d, suppressint %d\n",
 		argv[0], e, vforked, suppressint));
-	exerror(EXEXEC, "%s: %s", argv[0], errmsg(e, E_EXEC));
+	exerror(EXEXEC, "%s: %s", argv[0], errmsg(status, E_EXEC));
 	/* NOTREACHED */
 }
 
