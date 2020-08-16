@@ -173,19 +173,19 @@ shellexec(char **argv, char **envp, const char *path, int idx, int vforked)
 
 
 int
-tryspawn(pid_t pid, char **argv, char **envp, const char *path, int idx, int vforked)
+tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int vforked)
 {
 	char *cmdname;
         int status;
         int e;
 	if (strchr(argv[0], '/') != NULL) {
-		status = posix_spawn(&pid, argv[0], NULL, NULL, __UNCONST(argv), envp);
+		status = posix_spawn(pidp, argv[0], NULL, NULL, __UNCONST(argv), envp);
 		return status;
 	} else {
 		e = ENOENT;
 		while ((cmdname = padvance(&path, argv[0], 1)) != NULL) {
 		       if (--idx < 0 && pathopt == NULL) {
-				status = posix_spawn(&pid, cmdname, NULL, NULL, argv, envp);
+				status = posix_spawn(pidp, cmdname, NULL, NULL, argv, envp);
 				if (status)
 					return status;
 				if (errno != ENOENT && errno != ENOTDIR)
