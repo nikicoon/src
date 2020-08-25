@@ -179,7 +179,7 @@ int
 tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int vforked)
 {
 	char *cmdname;
-        int status;
+        int status = 0;
 	posix_spawnattr_t attr;
 	if (strchr(argv[0], '/') != NULL) {
 		posix_spawnattr_init(&attr);
@@ -194,13 +194,16 @@ tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int v
 			       	posix_spawnattr_init(&attr);
 				posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETPGROUP);
 				status = posix_spawn(pidp, cmdname, NULL, &attr, argv, envp);
+				fprintf(stderr, "status returns: %i\n", status);
 				posix_spawnattr_destroy(&attr);
 				if (status) {
 					fprintf(stderr, "reached padvance\n");
-					return status;
-				}
-				else
 					break;
+					//return status;
+				}// else {
+					return status;
+					// break;
+				//}
 			}
 		       stunalloc(cmdname);
 		}
