@@ -177,13 +177,20 @@ tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int v
 {
 	char *cmdname;
         int status;
+	posix_spawnattr_t attr;
 	if (strchr(argv[0], '/') != NULL) {
-		status = posix_spawn(pidp, argv[0], NULL, NULL, __UNCONST(argv), envp);
+		posix_spawnattr_init(&attr);
+		posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETPGROUP);
+		status = posix_spawn(pidp, argv[0], NULL, &attr, __UNCONST(argv), envp);
+		posix_spawnattr_destroy(&attr);
 		return status;
 	} else {
 		while ((cmdname = padvance(&path, argv[0], 1)) != NULL) {
 		       if (--idx < 0 && pathopt == NULL) {
-				status = posix_spawn(pidp, cmdname, NULL, NULL, argv, envp);
+			       	posix_spawnattr_init(&attr);
+				posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETPGROUP);
+				status = posix_spawn(pidp, cmdname, NULL, &attr, argv, envp);
+				posix_spawnattr_destroy(&attr);
 				if (status)
 					return status;
 				else
