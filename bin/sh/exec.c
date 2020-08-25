@@ -183,6 +183,7 @@ tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int v
 		posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETPGROUP);
 		status = posix_spawn(pidp, argv[0], NULL, &attr, __UNCONST(argv), envp);
 		posix_spawnattr_destroy(&attr);
+		fprintf(stderr, "reached strchr\n");
 		return status;
 	} else {
 		while ((cmdname = padvance(&path, argv[0], 1)) != NULL) {
@@ -191,8 +192,10 @@ tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int v
 				posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETPGROUP);
 				status = posix_spawn(pidp, cmdname, NULL, &attr, argv, envp);
 				posix_spawnattr_destroy(&attr);
-				if (status)
+				if (status) {
+					fprintf(stderr, "reached padvance\n");
 					return status;
+				}
 				else
 					break;
 			}
@@ -221,7 +224,7 @@ tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int v
 		break;
 	}
 	CTRACE(DBG_ERRS|DBG_CMDS|DBG_EVAL,
-	    ("shellexec failed for %s, errno %d, vforked %d, suppressint %d\n",
+	    ("tryspawn failed for %s, errno %d, vforked %d, suppressint %d\n",
 		argv[0], e, vforked, suppressint));
 	exerror(EXEXEC, "%s: %s", argv[0], errmsg(status, E_EXEC));
 	/* NOTREACHED */
