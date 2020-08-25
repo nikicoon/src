@@ -171,7 +171,10 @@ shellexec(char **argv, char **envp, const char *path, int idx, int vforked)
 	/* NOTREACHED */
 }
 
-
+/*
+ * Exec a program using posix_spawn(3). Returns the return value of
+ * the posix_spawn() call.
+ */
 int
 tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int vforked)
 {
@@ -202,6 +205,10 @@ tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int v
 		       stunalloc(cmdname);
 		}
 	}
+	/*
+	 * TODO: Check which ones we actually need with posix_spawn or
+	 * handle differently.
+	 */
 	/* Map to POSIX errors */
 	switch (status) {
 	case EACCES:	/* particularly this (unless no search perm) */
