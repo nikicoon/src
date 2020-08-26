@@ -50,6 +50,7 @@ __RCSID("$NetBSD: exec.c,v 1.54 2020/08/01 17:51:18 kre Exp $");
 #include <stdio.h>
 #include <stdlib.h>
 #include <spawn.h>
+#include <signal.h>
 
 /*
  * When commands are first encountered, they are entered in a hash table.
@@ -173,29 +174,51 @@ shellexec(char **argv, char **envp, const char *path, int idx, int vforked)
 
 /*
  * Exec a program using posix_spawn(3). Returns the return value of
- * the posix_spawn() call.
+ * the posix_spawn() call. This is used when mode is not FORK_FG,
+ * as posix_spawn lacks a way to do tcsetpgrp.
  */
 int
-tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int vforked)
+tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int vforked, int mode)
 {
 	char *cmdname;
         int status = 0;
-	posix_spawnattr_t attr;
+	posix_spawnattr_t spawn_attr;
+	struct sigaction intsa, quitsa, tstpsa, ttousa, sig_action;
+	sigset_t sig_mask;
+
+	memset(&sig_action, 0, sizeof(sig_action));
+	// XXX: investigate if the sigaction part could/should/must
+	// be moved to trap.c:setsignal().
+	sigemptyset(&sig_action.sa_mask);
+	sig_action.sa_flags = 0;
+	sigemptyset(&sig_mask);
+	if (mode == FORK_BG) {
+		// if mode == FORK_BG: ignore SIGINT, SIGQUIT
+		sig_action.sa_handler = SIG_IGN;
+		sigaction(SIGINT, &sig_action, &intsa);
+		sigaction(SIGQUIT, &sig_action, &quitsa);
+	} else {
+		// else: SIGTSTP, SIGTTOU
+		sig_action.sa_handler = SIG_DFL;
+		sigaction(SIGTSTP, &sig_action, &tstpsa);
+		sigaction(SIGTTOU, &sig_action, &ttousa);
+	}
 	if (strchr(argv[0], '/') != NULL) {
-		posix_spawnattr_init(&attr);
-		posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETPGROUP);
-		status = posix_spawn(pidp, argv[0], NULL, &attr, __UNCONST(argv), envp);
-		posix_spawnattr_destroy(&attr);
+		posix_spawnattr_init(&spawn_attr);
+		posix_spawnattr_setsigmask(&spawn_attr, &sig_mask);
+		posix_spawnattr_setflags(&spawn_attr, POSIX_SPAWN_SETPGROUP|POSIX_SPAWN_SETSIGDEF|POSIX_SPAWN_SETSIGMASK);
+		status = posix_spawn(pidp, argv[0], NULL, &spawn_attr, __UNCONST(argv), envp);
+		posix_spawnattr_destroy(&spawn_attr);
 		fprintf(stderr, "reached strchr\n");
 		return status;
 	} else {
 		while ((cmdname = padvance(&path, argv[0], 1)) != NULL) {
 		       if (--idx < 0 && pathopt == NULL) {
-			       	posix_spawnattr_init(&attr);
-				posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETPGROUP);
-				status = posix_spawn(pidp, cmdname, NULL, &attr, argv, envp);
+			       	posix_spawnattr_init(&spawn_attr);
+				posix_spawnattr_setflags(&spawn_attr, POSIX_SPAWN_SETPGROUP);
+				status = posix_spawn(pidp, cmdname, NULL, &spawn_attr, argv, envp);
 				fprintf(stderr, "status returns: %i\n", status);
-				posix_spawnattr_destroy(&attr);
+				posix_spawnattr_destroy(&spawn_attr);
 				if (status) {
 					fprintf(stderr, "reached padvance\n");
 					break;

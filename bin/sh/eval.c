@@ -1119,10 +1119,77 @@ evalcommand(union node *cmd, int flgs, struct backcmd *backcmd)
 			localvars = NULL;
 			vforked = 1;
 	VFORK_BLOCK
+		if (mode == FORK_FG) {
+			fprintf(stderr, "mode == FORK_FG\n");
+          		switch (pid = vfork()) {
+			case -1:
+				serrno = errno;
+				VTRACE(DBG_EVAL, ("vfork() failed, errno=%d\n",
+				    serrno));
+				INTON;
+				error("Cannot vfork (%s)", strerror(serrno));
+				break;
+			case 0:
+				/* Make sure that exceptions only unwind to
+				 * after the vfork(2)
+				 */
+				SHELL_FORKED();
+				if (setjmp(jmploc.loc)) {
+					if (exception == EXSHELLPROC) {
+						/*
+						 * We can't progress with the
+						 * vfork, so, set vforked = 2
+						 * so the parent knows,
+						 * and _exit();
+						 */
+						vforked = 2;
+						_exit(0);
+					} else {
+						_exit(exception == EXEXIT ?
+						    exitstatus : exerrno);
+					}
+				}
+				savehandler = handler;
+				handler = &jmploc;
+				listmklocal(varlist.list,
+				    VDOEXPORT | VEXPORT | VNOFUNC);
+				forkchild(jp, cmd, mode, vforked);
+				break;
+			default:
+				VFORK_UNDO();
+						/* restore from vfork(2) */
+				CTRACE(DBG_PROCS|DBG_CMDS,
+				    ("parent after vfork - vforked=%d\n",
+				      vforked));
+				handler = savehandler;
+				poplocalvars();
+				localvars = savelocalvars;
+				if (vforked == 2) {
+					vforked = 0;
+
+					(void)waitpid(pid, NULL, 0);
+					/*
+					 * We need to progress in a
+					 * normal fork fashion
+					 */
+					goto normal_fork;
+				}
+				/*
+				 * Here the child has left home,
+				 * getting on with its life, so
+				 * so must we...
+				 */
+				vforked = 0;
+				forkparent(jp, cmd, mode, pid);
+				goto parent;
+			}
+		}
+		else {
+			fprintf(stderr, "mode != FORK_FG\n");
 			envp = environment();
 			fprintf(stderr, "%s:%d value=%d\n", __func__, __LINE__, errno);
 			int status;
-			status = tryspawn(&pid, argv, envp, path, cmdentry.u.index, vforked);
+			status = tryspawn(&pid, argv, envp, path, cmdentry.u.index, vforked, mode);
 			fprintf(stderr, "%s:%d value=%d\n", __func__, __LINE__, errno);
 			fprintf(stderr, "status:%d\n", status);
 			// pid = vfork() case -1
@@ -1161,7 +1228,7 @@ evalcommand(union node *cmd, int flgs, struct backcmd *backcmd)
 				handler = &jmploc;
 				listmklocal(varlist.list,
 				    VDOEXPORT | VEXPORT | VNOFUNC);
-				forkchild(jp, cmd, mode, vforked);
+				//forkchild(jp, cmd, mode, vforked);
 			}
 			// default case
 			fprintf(stderr, "VFORK_UNDO()\n");
@@ -1194,6 +1261,7 @@ evalcommand(union node *cmd, int flgs, struct backcmd *backcmd)
 				forkparent(jp, cmd, mode, pid);
 				fprintf(stderr, "goto parent\n");
 				goto parent;
+			}
 			}
 	VFORK_END
 		} else {
@@ -1407,7 +1475,9 @@ evalcommand(union node *cmd, int flgs, struct backcmd *backcmd)
 			for (sp = varlist.list ; sp ; sp = sp->next)
 				setvareq(sp->text, VDOEXPORT|VEXPORT|VSTACK);
 		envp = environment();
-		// shellexec(argv, envp, path, cmdentry.u.index, vforked);
+		if (mode == FORK_FG) {
+			shellexec(argv, envp, path, cmdentry.u.index, vforked);
+		}
 		break;
 
 	}
