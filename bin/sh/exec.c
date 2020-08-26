@@ -192,17 +192,11 @@ tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int v
 	sigemptyset(&sig_action.sa_mask);
 	sig_action.sa_flags = 0;
 	sigemptyset(&sig_mask);
-	if (mode == FORK_BG) {
-		// if mode == FORK_BG: ignore SIGINT, SIGQUIT
-		sig_action.sa_handler = SIG_IGN;
-		sigaction(SIGINT, &sig_action, &intsa);
-		sigaction(SIGQUIT, &sig_action, &quitsa);
-	} else {
-		// else: SIGTSTP, SIGTTOU
-		sig_action.sa_handler = SIG_DFL;
-		sigaction(SIGTSTP, &sig_action, &tstpsa);
-		sigaction(SIGTTOU, &sig_action, &ttousa);
-	}
+	// mode == FORK_BG
+	// if mode == FORK_BG: ignore SIGINT, SIGQUIT
+	sig_action.sa_handler = SIG_IGN;
+	sigaction(SIGINT, &sig_action, &intsa);
+	sigaction(SIGQUIT, &sig_action, &quitsa);
 	if (strchr(argv[0], '/') != NULL) {
 		posix_spawnattr_init(&spawn_attr);
 		posix_spawnattr_setsigmask(&spawn_attr, &sig_mask);
