@@ -183,7 +183,7 @@ tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int v
 	char *cmdname;
         int status = 0;
 	posix_spawnattr_t spawn_attr;
-	struct sigaction intsa, quitsa, tstpsa, ttousa, sig_action;
+	struct sigaction intsa, quitsa, sig_action;
 	sigset_t sig_mask;
 
 	memset(&sig_action, 0, sizeof(sig_action));
