@@ -1262,7 +1262,7 @@ evalcommand(union node *cmd, int flgs, struct backcmd *backcmd)
 				fprintf(stderr, "goto parent\n");
 				goto parent;
 			}
-			}
+		}
 	VFORK_END
 		} else {
  normal_fork:
