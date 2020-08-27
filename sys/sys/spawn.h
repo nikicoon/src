@@ -47,7 +47,7 @@ struct posix_spawnattr {
 	sigset_t		sa_sigmask;
 };
 
-enum fae_action { FAE_OPEN, FAE_DUP2, FAE_CLOSE };
+enum fae_action { FAE_OPEN, FAE_DUP2, FAE_CLOSE, FAE_TCSETPGRP };
 typedef struct posix_spawn_file_actions_entry {
 	enum fae_action fae_action;
 

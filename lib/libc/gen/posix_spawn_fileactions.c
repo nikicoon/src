@@ -171,3 +171,28 @@ posix_spawn_file_actions_addclose(posix_spawn_file_actions_t *fa,
 
 	return 0;
 }
+
+/*
+ * If FAE_TCSETPGRP is set, call tcsetpgrp() on the file descriptor
+ * with the new pid.
+ */
+int
+posix_spawn_file_actions_addtcsetpgrp(posix_spawn_file_actions_t *fa,
+    int fildes)
+{
+	unsigned int i;
+	int error;
+
+	if (fildes < 0)
+		return EBADF;
+
+	error = posix_spawn_file_actions_getentry(fa, &i);
+	if (error)
+		return error;
+
+	fa->fae[i].fae_action = FAE_TCSETPGRP;
+	fa->fae[i].fae_fildes = fildes;
+	fa->len++;
+
+	return 0;
+}

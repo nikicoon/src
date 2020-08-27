@@ -36,14 +36,15 @@
 .\"
 .\" $FreeBSD: src/lib/libc/gen/posix_spawn_file_actions_addopen.3,v 1.2.2.1.4.1 2010/06/14 02:09:06 kensmith Exp $
 .\"
-.Dd February 2, 2014
+.Dd August 26, 2020
 .Dt POSIX_SPAWN_FILE_ACTIONS_ADDOPEN 3
 .Os
 .Sh NAME
 .Nm posix_spawn_file_actions_addopen ,
 .Nm posix_spawn_file_actions_adddup2 ,
-.Nm posix_spawn_file_actions_addclose
-.Nd "add open, dup2 or close action to spawn file actions object"
+.Nm posix_spawn_file_actions_addclose ,
+.Nm posix_spawn_file_actions_tcsetpgrp
+.Nd "add open, dup2, close or tcsetpgrp action to spawn file actions object"
 .Sh LIBRARY
 .Lb libc
 .Sh SYNOPSIS
@@ -54,8 +55,10 @@
 .Fn posix_spawn_file_actions_adddup2 "posix_spawn_file_actions_t * file_actions" "int fildes" "int newfildes"
 .Ft int
 .Fn posix_spawn_file_actions_addclose "posix_spawn_file_actions_t * file_actions" "int fildes"
+.Ft int
+.Fn posix_spawn_file_actions_tcsetpgrp "posix_spawn_file_actions_t * file_actions" "int fildes"
 .Sh DESCRIPTION
-These functions add an open, dup2 or close action to a spawn
+These functions add an open, dup2, close or tcsetpgrp action to a spawn
 file actions object.
 .Pp
 A spawn file actions object is of type
@@ -140,6 +143,17 @@ close(fildes)
 .Pp
 had been called) when a new process is spawned using this file actions
 object.
+.Pp
+The
+.Fn posix_spawn_file_actions_tcsetpgrp
+functions adds a tcsetpgrp action to the object referenced by
+.Fa file_actions
+that causes
+.Xr tcsetpgrp
+to be called on the file descriptor
+.Fa fildes
+with the new pid, when a new process is spawned using this
+file actions object.
 .Sh RETURN VALUES
 Upon successful completion, these functions return zero;
 otherwise, an error number is returned to indicate the error.
@@ -164,6 +178,7 @@ Insufficient memory exists to add to the spawn file actions object.
 .Xr close 2 ,
 .Xr dup2 2 ,
 .Xr open 2 ,
+.Xr tcsetpgrp 3 ,
 .Xr posix_spawn 3 ,
 .Xr posix_spawn_file_actions_destroy 3 ,
 .Xr posix_spawn_file_actions_init 3 ,
@@ -186,5 +201,11 @@ functions first appeared in
 .Fx 8.0
 and imported for
 .Nx 6.0 .
+The
+.Fn posix_spawn_file_actions_tcsetpgrp
+function was added for
+.Nx 10.0
+during Google Summer of Code 2020 by
+Nikita Gillmann.
 .Sh AUTHORS
 .An Ed Schouten Aq Mt ed@FreeBSD.org

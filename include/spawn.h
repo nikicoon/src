@@ -55,6 +55,7 @@ int posix_spawn_file_actions_addopen(posix_spawn_file_actions_t * __restrict,
     int, const char * __restrict, int, mode_t);
 int posix_spawn_file_actions_adddup2(posix_spawn_file_actions_t *, int, int);
 int posix_spawn_file_actions_addclose(posix_spawn_file_actions_t *, int);
+int posix_spawn_file_actions_addtcsetpgrp(posix_spawn_file_actions_t *, int);
 
 /*
  * Spawn attributes
