@@ -183,8 +183,10 @@ tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int v
 	char *cmdname;
         int status = 0;
 	posix_spawnattr_t spawn_attr;
+	posix_spawn_file_actions_t fileaction_obj;
 	struct sigaction intsa, quitsa, sig_action;
 	sigset_t sig_mask;
+	static int ttyfd = -1;
 
 	memset(&sig_action, 0, sizeof(sig_action));
 	// XXX: investigate if the sigaction part could/should/must
@@ -192,17 +194,23 @@ tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int v
 	sigemptyset(&sig_action.sa_mask);
 	sig_action.sa_flags = 0;
 	sigemptyset(&sig_mask);
-	// mode == FORK_BG
 	// if mode == FORK_BG: ignore SIGINT, SIGQUIT
-	sig_action.sa_handler = SIG_IGN;
-	sigaction(SIGINT, &sig_action, &intsa);
-	sigaction(SIGQUIT, &sig_action, &quitsa);
+	if (mode == FORK_BG) {
+		sig_action.sa_handler = SIG_IGN;
+		sigaction(SIGINT, &sig_action, &intsa);
+		sigaction(SIGQUIT, &sig_action, &quitsa);
+	} else if (mode == FORK_FG) {
+		// stub
+	}
 	if (strchr(argv[0], '/') != NULL) {
 		posix_spawnattr_init(&spawn_attr);
 		posix_spawnattr_setsigmask(&spawn_attr, &sig_mask);
 		posix_spawnattr_setflags(&spawn_attr, (POSIX_SPAWN_SETPGROUP|POSIX_SPAWN_SETSIGDEF|POSIX_SPAWN_SETSIGMASK));
+		posix_spawn_file_actions_init(&fileaction_obj);
+		posix_spawn_file_actions_addtcsetpgrp(&fileaction_obj, ttyfd);
 		status = posix_spawn(pidp, argv[0], NULL, &spawn_attr, __UNCONST(argv), envp);
 		posix_spawnattr_destroy(&spawn_attr);
+		posix_spawn_file_actions_destroy(&fileaction_obj);
 		fprintf(stderr, "reached strchr\n");
 		return status;
 	} else {
@@ -210,9 +218,12 @@ tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int v
 		       if (--idx < 0 && pathopt == NULL) {
 			       	posix_spawnattr_init(&spawn_attr);
 				posix_spawnattr_setflags(&spawn_attr, (POSIX_SPAWN_SETPGROUP|POSIX_SPAWN_SETSIGDEF|POSIX_SPAWN_SETSIGMASK));
+				posix_spawn_file_actions_init(&fileaction_obj);
+				posix_spawn_file_actions_addtcsetpgrp(&fileaction_obj, ttyfd);
 				status = posix_spawn(pidp, cmdname, NULL, &spawn_attr, argv, envp);
 				fprintf(stderr, "status returns: %i\n", status);
 				posix_spawnattr_destroy(&spawn_attr);
+				posix_spawn_file_actions_destroy(&fileaction_obj);
 				if (status) {
 					fprintf(stderr, "reached padvance\n");
 					break;
@@ -228,6 +239,8 @@ tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int v
 	/*
 	 * TODO: Check which ones we actually need with posix_spawn or
 	 * handle differently.
+	 *
+	 * EBADF,
 	 */
 	/* Map to POSIX errors */
 	switch (status) {
