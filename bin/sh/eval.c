@@ -1112,7 +1112,7 @@ evalcommand(union node *cmd, int flgs, struct backcmd *backcmd)
 		 */
 		if (usefork == 0 && cmdentry.cmdtype == CMDNORMAL &&
 		    (!cmd->ncmd.backgnd || cmd->ncmd.redirect == NULL)) {
-			pid_t   pid;
+			pid_t	pid;
 			int serrno;
 
 			savelocalvars = localvars;
