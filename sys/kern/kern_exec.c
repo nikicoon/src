@@ -2063,6 +2063,8 @@ handle_posix_spawn_file_actions(struct posix_spawn_file_actions *actions)
 	struct lwp *l = curlwp;
 	register_t retval;
 	int error, newfd;
+	pid_t *pgid;
+	struct file *fp;
 
 	if (actions == NULL)
 		return 0;
@@ -2097,6 +2099,16 @@ handle_posix_spawn_file_actions(struct posix_spawn_file_actions *actions)
 				return EBADF;
 			}
 			error = fd_close(fae->fae_fildes);
+			break;
+		case FAE_TCSETPGRP:
+			pgid = l->l_proc->p_pid;
+			if ((fp = fd_getfile(newfd)) == NULL)
+				return EBADF;
+			if ((fp->f_flag & (FREAD | FWRITE)) == 0)
+				return EBADF;
+			error = (*fp->f_ops->f_ioctl)(fp, TIOCSPGRP, pgid);
+			fd_putfile(newfd);
+			// return (error);
 			break;
 		}
 		if (error)
