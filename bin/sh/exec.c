@@ -200,7 +200,7 @@ tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int v
 	if (strchr(argv[0], '/') != NULL) {
 		posix_spawnattr_init(&spawn_attr);
 		posix_spawnattr_setsigmask(&spawn_attr, &sig_mask);
-		posix_spawnattr_setflags(&spawn_attr, (POSIX_SPAWN_SETPGROUP|POSIX_SPAWN_SETSIGDEF)|POSIX_SPAWN_SETSIGMASK);
+		posix_spawnattr_setflags(&spawn_attr, (POSIX_SPAWN_SETPGROUP|POSIX_SPAWN_SETSIGDEF|POSIX_SPAWN_SETSIGMASK));
 		status = posix_spawn(pidp, argv[0], NULL, &spawn_attr, __UNCONST(argv), envp);
 		posix_spawnattr_destroy(&spawn_attr);
 		fprintf(stderr, "reached strchr\n");
@@ -209,7 +209,7 @@ tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int v
 		while ((cmdname = padvance(&path, argv[0], 1)) != NULL) {
 		       if (--idx < 0 && pathopt == NULL) {
 			       	posix_spawnattr_init(&spawn_attr);
-				posix_spawnattr_setflags(&spawn_attr, (POSIX_SPAWN_SETPGROUP|POSIX_SPAWN_SETSIGDEF)|POSIX_SPAWN_SETSIGMASK);
+				posix_spawnattr_setflags(&spawn_attr, (POSIX_SPAWN_SETPGROUP|POSIX_SPAWN_SETSIGDEF|POSIX_SPAWN_SETSIGMASK));
 				status = posix_spawn(pidp, cmdname, NULL, &spawn_attr, argv, envp);
 				fprintf(stderr, "status returns: %i\n", status);
 				posix_spawnattr_destroy(&spawn_attr);
