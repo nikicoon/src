@@ -176,17 +176,47 @@ shellexec(char **argv, char **envp, const char *path, int idx, int vforked)
  * Exec a program using posix_spawn(3). Returns the return value of
  * the posix_spawn() call. This is used when mode is not FORK_FG,
  * as posix_spawn lacks a way to do tcsetpgrp.
+ * This replicates parts of tryexec() and forkchild().
+ *
+ * IMPORTANT: Figure out if jobcontrol is enabled by default for scripts:
+ * So, it may turn out that you need to teach posix_spawn to pass a prescribed
+ * pid to the setpgid and tcsetpgrp actions.  Or, you might look into whether
+ * job control is enabled by default for scripts, and if not, your life
+ * becomes a lot easier (but we have to keep around the fork/exec logic for
+ * shells with job control).
+ * - execinterp ("#!" lines) are passed to shellexec, which is fork+exec.
+ * - when !BSD tryexec does execute execinterp()
+ *
+ *
+ * Since execinterp() is following an fork+exec path via shellexec,
  */
 int
 tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int vforked, int mode)
 {
 	char *cmdname;
         int status = 0;
+	int wasroot;
 	posix_spawnattr_t spawn_attr;
 	posix_spawn_file_actions_t fileaction_obj;
 	struct sigaction intsa, quitsa, sig_action;
 	sigset_t sig_mask;
 	static int ttyfd = -1;
+
+	wasroot = rootshell;
+
+	if (!vforked) {
+		rootshell = 0;
+		handler = &main_handler;
+	}
+
+	closescript(vforked);
+	clear_traps(vforked);
+
+#if JOBS
+	if (!vforked)
+		jobctl = 0;		/* do job control only in root shell */
+	if (wasroot && mode != FORK_NOJOB && mflag) {
+		if (jp == NULL || jp->nprocs == 0)
 
 	memset(&sig_action, 0, sizeof(sig_action));
 	// XXX: investigate if the sigaction part could/should/must
@@ -240,7 +270,10 @@ tryspawn(pid_t *pidp, char **argv, char **envp, const char *path, int idx, int v
 	 * TODO: Check which ones we actually need with posix_spawn or
 	 * handle differently.
 	 *
-	 * EBADF,
+	 * tcsetpgrp: EBADF,
+	 * file_actions_init: ENOMEM
+	 * file_actions_destroy: EINVAL
+	 *
 	 */
 	/* Map to POSIX errors */
 	switch (status) {
